@@ -29,7 +29,7 @@ st_config.set_option("theme.font", APP_FONT_CSS)
 st_config.set_option("theme.headingFont", APP_FONT_CSS)
 st_config.set_option("theme.baseFontSize", 16)
 st_config.set_option("theme.headingFontSizes", list(APP_HEADING_FONT_SIZES))
-st.set_page_config(page_title="Activity Insights", page_icon="🚴", layout="wide")
+st.set_page_config(page_title="Strava Insights", page_icon="🚴", layout="wide")
 
 default_background_hex = rgb_to_hex(DEFAULT_BACKGROUND_RGB)
 selected_background_hex = st.session_state.get("report_background_color", default_background_hex)
@@ -214,7 +214,7 @@ def prepare_pdf_download(model: dict, background_rgb: tuple[int, int, int]) -> b
     return build_report_pdf(model, background_rgb)
 
 
-st.title("Activity Insights")
+st.title("Strava Insights")
 st.caption("A focused overview of your sports activities.")
 
 with st.container(border=True):

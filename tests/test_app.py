@@ -10,7 +10,7 @@ class ApplicationSmokeTests(unittest.TestCase):
         app = AppTest.from_file("app.py").run(timeout=10)
 
         self.assertEqual(len(app.exception), 0)
-        self.assertEqual(app.title[0].value, "Activity Insights")
+        self.assertEqual(app.title[0].value, "Strava Insights")
         self.assertIn("Get Insights", app.info[0].value)
 
     def test_processed_report_renders_with_partial_activity_data(self) -> None:

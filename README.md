@@ -1,6 +1,6 @@
-# Activity Insights
+# Strava Insights
 
-Activity Insights is a single-page Streamlit application that turns an exported sports-activity CSV into a focused,
+Strava Insights is a single-page Streamlit application that turns an exported sports-activity CSV into a focused,
 filterable report. It is designed for cycling, running, and walking data and can export the displayed report as a
 color-preserving PDF.
 
