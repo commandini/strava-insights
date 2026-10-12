@@ -29,7 +29,7 @@ streamlit run app.py
 On Windows PowerShell, activate the environment with `.venv\Scripts\Activate.ps1`.
 
 Upload an activities CSV, choose an activity type and any optional filters, and select **Get Insights**. The included
-`data.csv` contains fully synthetic activities that can be used to explore the report.
+`data.csv` is a synthetic demo using fields supported by this app; it is not a complete Strava export template.
 
 ## CSV compatibility
 
@@ -90,8 +90,8 @@ python scripts/package.py
 ```
 
 The system ZIP utility prompts for the password twice, so the password is never passed as a command-line argument. Use
-`--include-sample-data` to include `data.csv`, and `--force` to atomically replace an existing archive after the
-replacement passes verification.
+`--include-sample-data` to include the synthetic `data.csv`, and `--force` to atomically replace an existing archive
+after the replacement passes verification.
 
 The built-in ZIP utility uses traditional ZIP encryption for compatibility. Use a dedicated AES-capable archiver when
 stronger encryption is required.

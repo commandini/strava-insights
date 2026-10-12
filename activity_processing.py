@@ -8,6 +8,8 @@ import pandas as pd
 
 from data_loading import MISSING_TEXT_VALUES, read_activities_csv
 
+MAX_UNIT_RELATIVE_ERROR = 0.2
+
 
 def _meaningful_text(series: pd.Series) -> pd.Series:
     normalized = series.astype("string").str.strip().str.casefold()
@@ -35,8 +37,14 @@ def numeric_series(frame: pd.DataFrame, *names: str) -> pd.Series:
 
 def nonnegative_series(frame: pd.DataFrame, *names: str) -> pd.Series:
     """Return finite numeric values, treating negative domain values as missing."""
-    values = numeric_series(frame, *names)
-    return values.where(values.ge(0))
+    result = pd.Series(float("nan"), index=frame.index, dtype="float64")
+    for name in names:
+        if name not in frame.columns:
+            continue
+        candidate = pd.to_numeric(frame[name], errors="coerce")
+        candidate = candidate.where(candidate.ge(0) & candidate.lt(float("inf")))
+        result = result.fillna(candidate)
+    return result
 
 
 def effective_speed_series(
@@ -101,7 +109,7 @@ def _infer_unit_factors(
     *,
     detailed_export: bool = False,
     summary_export: bool = False,
-) -> tuple[float, float]:
+) -> tuple[float, float, bool]:
     paired = distance.notna() & distance.gt(0) & moving_hours.gt(0) & raw_speed.gt(0)
     if paired.any():
         best_error = float("inf")
@@ -114,18 +122,18 @@ def _infer_unit_factors(
                 if relative_error < best_error:
                     best_error = float(relative_error)
                     best_factors = (distance_factor, speed_factor)
-        return best_factors
+        return *best_factors, best_error <= MAX_UNIT_RELATIVE_ERROR
 
     if detailed_export:
-        return 0.001, 3.6
+        return 0.001, 3.6, False
     if summary_export:
-        return 1.0, 1.0
+        return 1.0, 1.0, False
 
     known_distances = distance.dropna()
     distance_factor = (
         0.001 if not known_distances.empty and known_distances.median() > 500 else 1.0
     )
-    return distance_factor, 1.0
+    return distance_factor, 1.0, False
 
 
 def prepare_activities(file_bytes: bytes) -> pd.DataFrame:
@@ -154,7 +162,7 @@ def prepare_activities(file_bytes: bytes) -> pd.DataFrame:
     summary_export = not detailed_export and any(
         name in frame.columns for name in ("Date", "Name", "Gear")
     )
-    distance_factor, speed_factor = _infer_unit_factors(
+    distance_factor, speed_factor, units_verified = _infer_unit_factors(
         distance,
         frame["_moving_hours"],
         raw_speed,
@@ -178,9 +186,15 @@ def prepare_activities(file_bytes: bytes) -> pd.DataFrame:
     for internal, source in mappings.items():
         frame[internal] = nonnegative_series(frame, source)
 
-    if not detailed_export and not summary_export and not (
-        distance.notna() & frame["_moving_hours"].gt(0) & raw_speed.gt(0)
-    ).any():
+    has_unit_evidence = (
+        distance.gt(0) & frame["_moving_hours"].gt(0) & raw_speed.gt(0)
+    ).any()
+    if has_unit_evidence and not units_verified:
+        frame.attrs["unit_inference_warning"] = (
+            "Distance, duration, and speed disagree under the supported unit conventions. "
+            "Check the CSV units and recorded values before relying on this report."
+        )
+    elif not detailed_export and not summary_export and not units_verified:
         frame.attrs["unit_inference_warning"] = (
             "Distance and speed units could not be verified from the available columns. "
             "The report inferred them from the recorded values."

@@ -1,13 +1,16 @@
 import unittest
 from datetime import date
+from pathlib import Path
 
 import pandas as pd
 from streamlit.testing.v1 import AppTest
 
+APP_PATH = Path(__file__).resolve().parents[1] / "app.py"
+
 
 class ApplicationSmokeTests(unittest.TestCase):
     def test_initial_page_renders_without_exceptions(self) -> None:
-        app = AppTest.from_file("app.py").run(timeout=10)
+        app = AppTest.from_file(APP_PATH).run(timeout=10)
 
         self.assertEqual(len(app.exception), 0)
         self.assertEqual(app.title[0].value, "Strava Insights")
@@ -29,7 +32,7 @@ class ApplicationSmokeTests(unittest.TestCase):
             "_avg_watts": [180.0, None],
             "_relative_effort": [30.0, None],
         })
-        app = AppTest.from_file("app.py")
+        app = AppTest.from_file(APP_PATH)
         app.session_state["activities"] = activities
         app.session_state["applied_date_range"] = (
             date(2024, 1, 1),

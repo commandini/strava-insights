@@ -291,16 +291,17 @@ class CalendarHeatmapTests(unittest.TestCase):
         self.assertTrue(calendar.loc["January 1", "Is peak"])
         self.assertFalse(calendar.loc["December 31", "Is peak"])
 
-    def test_chart_uses_a_diamond_for_the_peak_day(self) -> None:
+    def test_calendar_chart_labels_cells_and_only_tooltips_the_day(self) -> None:
         calendar = build_calendar_heatmap(activities_frame([
             {"_date": "2024-05-26"},
         ]))
 
         spec = build_calendar_heatmap_chart(calendar).to_dict()
 
-        self.assertEqual(spec["layer"][0]["mark"]["type"], "rect")
-        self.assertEqual(spec["layer"][1]["mark"]["shape"], "diamond")
-        self.assertIn("Is peak", spec["layer"][1]["transform"][0]["filter"])
+        self.assertEqual([layer["mark"]["type"] for layer in spec["layer"]], ["rect", "text"])
+        for layer in spec["layer"]:
+            self.assertEqual(layer["encoding"]["tooltip"]["field"], "Calendar day")
+        self.assertEqual(spec["layer"][1]["encoding"]["text"]["field"], "Activity count")
         self.assertEqual(len(spec["datasets"][next(iter(spec["datasets"]))]), 366)
 
     def test_hourly_heatmap_contains_all_hours_and_aggregates_start_times(self) -> None:
@@ -344,21 +345,19 @@ class CalendarHeatmapTests(unittest.TestCase):
         self.assertTrue(hours.loc[8, "Is peak"])
         self.assertFalse(hours.loc[18, "Is peak"])
 
-    def test_hourly_chart_uses_24_cells_and_a_diamond_peak_marker(self) -> None:
+    def test_hourly_chart_labels_24_cells_without_tooltips(self) -> None:
         hours = build_hourly_heatmap(activities_frame([
             {"_date": "2024-01-01 08:00"},
         ]))
 
         spec = build_hourly_heatmap_chart(hours).to_dict()
 
-        self.assertEqual(spec["layer"][0]["mark"]["type"], "rect")
-        self.assertEqual(spec["layer"][1]["mark"]["shape"], "diamond")
+        self.assertEqual([layer["mark"]["type"] for layer in spec["layer"]], ["rect", "text"])
         self.assertEqual(len(spec["datasets"][next(iter(spec["datasets"]))]), 24)
-        tooltip = spec["layer"][0]["encoding"]["tooltip"]
-        self.assertEqual(
-            [field["title"] for field in tooltip],
-            ["Start hour", "Activity count"],
-        )
+        for layer in spec["layer"]:
+            self.assertFalse(layer["mark"]["tooltip"])
+            self.assertIsNone(layer["encoding"]["tooltip"]["value"])
+        self.assertEqual(spec["layer"][1]["encoding"]["text"]["field"], "Activity count")
 
 
 class RideMetricsTests(unittest.TestCase):

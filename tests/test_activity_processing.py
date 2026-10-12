@@ -114,6 +114,16 @@ class PrepareActivitiesTests(unittest.TestCase):
         ):
             self.assertTrue(pd.isna(activities.loc[0, column]), column)
 
+    def test_invalid_primary_measurements_use_valid_aliases(self) -> None:
+        activities = prepare_activities(
+            b"Date,Type,Distance,Grade Adjusted Distance,Moving Time,Timer Time\n"
+            b"2024-01-01,Ride,-1,10,inf,3600\n"
+        )
+
+        self.assertEqual(activities.loc[0, "_distance_km"], 10)
+        self.assertEqual(activities.loc[0, "_moving_hours"], 1)
+        self.assertEqual(activities.loc[0, "_avg_speed_kmh"], 10)
+
     def test_uses_detailed_export_units_without_speed_or_time_evidence(self) -> None:
         activities = prepare_activities(
             b"Activity ID,Activity Date,Activity Type,Distance\n1,2024-01-01,Walk,400\n"
@@ -127,6 +137,14 @@ class PrepareActivitiesTests(unittest.TestCase):
         )
 
         self.assertIn("could not be verified", activities.attrs["unit_inference_warning"])
+
+    def test_warns_when_distance_duration_and_speed_disagree(self) -> None:
+        activities = prepare_activities(
+            b"Activity Date,Activity Type,Distance,Moving Time,Average Speed\n"
+            b"2024-01-01,Ride,10,3600,1000\n"
+        )
+
+        self.assertIn("disagree", activities.attrs["unit_inference_warning"])
 
     def test_uses_motion_consistency_to_infer_distance_units(self) -> None:
         kilometres = prepare_activities(

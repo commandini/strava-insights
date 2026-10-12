@@ -636,10 +636,7 @@ def build_calendar_heatmap_chart(calendar: pd.DataFrame) -> alt.Chart:
                 ticks=False,
             ),
         ),
-        tooltip=[
-            alt.Tooltip("Calendar day:N", title="Calendar day"),
-            alt.Tooltip("Activity count:Q", title="Activity count", format="d"),
-        ],
+        tooltip=alt.Tooltip("Calendar day:N", title="Calendar day"),
     )
     cells = base.mark_rect(
         cornerRadius=2,
@@ -656,13 +653,15 @@ def build_calendar_heatmap_chart(calendar: pd.DataFrame) -> alt.Chart:
             ),
         )
     )
-    peak = base.transform_filter(alt.datum["Is peak"]).mark_point(
-        color=NAVY,
-        filled=True,
-        shape="diamond",
-        size=48,
+    labels = base.mark_text(font=APP_FONT_CSS, fontSize=9).encode(
+        text=alt.Text("Activity count:Q", format="d"),
+        color=alt.condition(
+            alt.datum["Activity count"] > maximum / 2,
+            alt.value("#FFFFFF"),
+            alt.value(NAVY),
+        ),
     )
-    return (cells + peak).properties(height=180).configure_view(strokeOpacity=0)
+    return (cells + labels).properties(height=180).configure_view(strokeOpacity=0)
 
 
 def build_hourly_heatmap_chart(hours: pd.DataFrame) -> alt.Chart:
@@ -688,15 +687,13 @@ def build_hourly_heatmap_chart(hours: pd.DataFrame) -> alt.Chart:
             ),
         ),
         y=alt.Y("Row:N", title=None, axis=None),
-        tooltip=[
-            alt.Tooltip("Start hour:N", title="Start hour"),
-            alt.Tooltip("Activity count:Q", title="Activity count", format="d"),
-        ],
+        tooltip=alt.value(None),
     )
     cells = base.mark_rect(
         cornerRadius=2,
         stroke="#FFFFFF",
         strokeWidth=1,
+        tooltip=False,
     ).encode(
         color=alt.Color(
             "Activity count:Q",
@@ -708,13 +705,15 @@ def build_hourly_heatmap_chart(hours: pd.DataFrame) -> alt.Chart:
             ),
         )
     )
-    peak = base.transform_filter(alt.datum["Is peak"]).mark_point(
-        color=NAVY,
-        filled=True,
-        shape="diamond",
-        size=48,
+    labels = base.mark_text(font=APP_FONT_CSS, fontSize=12, tooltip=False).encode(
+        text=alt.Text("Activity count:Q", format="d"),
+        color=alt.condition(
+            alt.datum["Activity count"] > maximum / 2,
+            alt.value("#FFFFFF"),
+            alt.value(NAVY),
+        ),
     )
-    return (cells + peak).properties(height=80).configure_view(strokeOpacity=0)
+    return (cells + labels).properties(height=80).configure_view(strokeOpacity=0)
 
 
 def build_ride_metrics(
@@ -939,29 +938,23 @@ def render_report(model: dict) -> None:
     else:
         st.altair_chart(
             build_speed_distribution_chart(model["speed_distribution"]),
-            use_container_width=True,
+            width="stretch",
             theme=None,
         )
 
     st.subheader("Heatmaps")
     st.markdown("#### Calendar days")
-    st.caption(
-        "Activity counts are aggregated by calendar day across all selected years. "
-        "A navy diamond marks the most active day."
-    )
+    st.caption("Activity counts are aggregated by calendar day across all selected years.")
     st.altair_chart(
         build_calendar_heatmap_chart(model["calendar_heatmap"]),
-        use_container_width=True,
+        width="stretch",
         theme=None,
     )
     st.markdown("#### Start hours")
-    st.caption(
-        "Activity counts are grouped by start hour. "
-        "A navy diamond marks the most active hour."
-    )
+    st.caption("Activity counts are grouped by start hour.")
     st.altair_chart(
         build_hourly_heatmap_chart(model["hourly_heatmap"]),
-        use_container_width=True,
+        width="stretch",
         theme=None,
     )
 
@@ -1041,7 +1034,7 @@ def render_report(model: dict) -> None:
         else:
             st.altair_chart(
                 build_yearly_distance_chart(yearly),
-                use_container_width=True,
+                width="stretch",
                 theme=None,
             )
 
@@ -1052,7 +1045,7 @@ def render_report(model: dict) -> None:
         else:
             st.altair_chart(
                 build_yearly_speed_chart(yearly),
-                use_container_width=True,
+                width="stretch",
                 theme=None,
             )
 
