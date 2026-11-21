@@ -24,7 +24,9 @@ classifiers = [
 dependencies = [
   "altair>=5.0",
   "pandas>=2.0",
-  "reportlab>=4.0",
+  # reportlab 5.1 requires Python 3.10 at import time but its metadata still allows 3.9.
+  "reportlab>=4.0,<5.1; python_version < '3.10'",
+  "reportlab>=4.0; python_version >= '3.10'",
   "streamlit>=1.50",
 ]
 
