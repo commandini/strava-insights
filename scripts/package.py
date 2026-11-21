@@ -102,7 +102,7 @@ def create_archive(
     if not output.is_absolute():
         output = root / output
     output = output.resolve()
-    source_paths = {(root / relative_path).resolve() for relative_path in files}
+    source_paths = {(root / path).resolve() for path in (*PROJECT_FILES, SAMPLE_DATA_FILE)}
     if output in source_paths:
         raise ValueError(f"Archive output cannot replace a project source file: {output}")
     if output.exists() and not force:

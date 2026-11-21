@@ -1,6 +1,8 @@
 import unittest
 from datetime import date
+from io import BytesIO
 from pathlib import Path
+from unittest.mock import patch
 
 import pandas as pd
 from streamlit.testing.v1 import AppTest
@@ -15,6 +17,34 @@ class ApplicationSmokeTests(unittest.TestCase):
         self.assertEqual(len(app.exception), 0)
         self.assertEqual(app.title[0].value, "Strava Insights")
         self.assertIn("Get Insights", app.info[0].value)
+
+    def test_upload_and_pdf_are_reused_only_for_the_current_source(self) -> None:
+        csv_file = BytesIO(b"Type,Distance\nRide,20\n")
+        with patch("streamlit.file_uploader", return_value=csv_file) as upload:
+            app = AppTest.from_file(APP_PATH).run(timeout=10)
+            app.button[0].click().run()
+            source = app.session_state["source_activities"]
+            pdf = app.session_state["report_pdf"]
+
+            app.run()
+            self.assertIs(app.session_state["source_activities"], source)
+            self.assertIs(app.session_state["report_pdf"], pdf)
+
+            app.color_picker[0].set_value("#123456").run()
+            self.assertEqual(app.session_state["report_pdf"][0], (18, 52, 86))
+
+            upload.return_value = BytesIO(b"Type,Distance\nRun,10\n")
+            app.run()
+            self.assertNotIn("report_pdf", app.session_state)
+            self.assertEqual(app.selectbox[0].value, "Run")
+
+            app.button[0].click().run()
+            self.assertIn("report_pdf", app.session_state)
+            upload.return_value = None
+            app.run()
+            self.assertNotIn("source_activities", app.session_state)
+            self.assertNotIn("report_pdf", app.session_state)
+            self.assertEqual(len(app.exception), 0)
 
     def test_processed_report_renders_with_partial_activity_data(self) -> None:
         activities = pd.DataFrame({

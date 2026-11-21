@@ -43,6 +43,10 @@ class PackageProjectTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "cannot replace a project source file"):
             create_archive(self.root, Path("app.py"), force=True)
 
+    def test_protects_sample_data_when_it_is_omitted_from_the_archive(self) -> None:
+        with self.assertRaisesRegex(ValueError, "cannot replace a project source file"):
+            create_archive(self.root, Path("data.csv"), force=True)
+
 
 if __name__ == "__main__":
     unittest.main()

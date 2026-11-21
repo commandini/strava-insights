@@ -19,6 +19,34 @@ class DuplicateColumnTests(unittest.TestCase):
         self.assertEqual(list(frame.columns), ["Unnamed: 0", "Distance", "Unnamed: 2"])
         self.assertEqual(frame.loc[0, "Distance"], 10)
 
+    def test_rejects_extra_fields_even_when_pandas_could_infer_an_index(self) -> None:
+        for rows, line in ((b"0,10,extra\n1,20\n", 2), (b"0,10\n1,20,\n", 3)):
+            with self.subTest(rows=rows), self.assertRaisesRegex(
+                pd.errors.ParserError, rf"line {line}, saw 3"
+            ):
+                read_activities_csv(b"Activity,Distance\n" + rows)
+
+    def test_accepts_quoted_multiline_fields_and_missing_trailing_values(self) -> None:
+        frame = read_activities_csv(b'Activity,Distance,Notes\r\n"Ride,\r\n morning",10\r\n')
+
+        self.assertEqual(frame.loc[0, "Activity"], "Ride,\r\n morning")
+        self.assertTrue(pd.isna(frame.loc[0, "Notes"]))
+
+    def test_accepts_long_quoted_fields(self) -> None:
+        notes = b"Ride notes, continued\n" * 7000
+        frame = read_activities_csv(b'Activity,Notes\nRide,"' + notes + b'"\n')
+
+        self.assertEqual(frame.loc[0, "Notes"], notes.decode())
+
+    def test_selects_valid_duplicate_measurements(self) -> None:
+        frame = read_activities_csv(
+            b"Distance,Distance,Average Speed,Average Speed\n"
+            b"-1,10,inf,20\n40,,30,\n50,,35,\n"
+        )
+
+        self.assertEqual(frame["Distance"].tolist(), [10, 40, 50])
+        self.assertEqual(frame["Average Speed"].tolist(), [20, 30, 35])
+
     def test_coalesces_duplicate_columns_row_by_row(self) -> None:
         csv_bytes = (
             "Activity,Distance,Distance\n"

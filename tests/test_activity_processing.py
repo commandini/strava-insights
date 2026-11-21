@@ -48,6 +48,48 @@ class PrepareActivitiesTests(unittest.TestCase):
 
         self.assertEqual(activities["_distance_km"].tolist(), [85.0, 42.0])
 
+    def test_normalizes_distance_columns_with_disjoint_speed_evidence(self) -> None:
+        activities = prepare_activities(
+            b"Activity ID,Activity Type,Distance,Distance,Moving Time,Average Speed\n"
+            b"1,Ride,40,,3600,11.1111\n2,Ride,20,,3600,5.55555\n"
+            b"3,Ride,,30000,3600,8.3333\n4,Ride,,15000,3600,4.16667\n"
+        )
+
+        self.assertEqual(activities["_distance_km"].tolist(), [40, 20, 30, 15])
+        self.assertAlmostEqual(activities.loc[1, "_avg_speed_kmh"], 20, places=3)
+        self.assertNotIn("unit_inference_warning", activities.attrs)
+
+    def test_normalizes_duplicate_distance_units_from_overlapping_rows(self) -> None:
+        activities = prepare_activities(
+            b"Activity ID,Activity Type,Distance,Distance\n"
+            b"1,Ride,40,40000\n2,Ride,20,\n3,Ride,,30000\n4,Ride,,15000\n"
+        )
+
+        self.assertEqual(activities["_distance_km"].tolist(), [40, 20, 30, 15])
+        self.assertNotIn("unit_inference_warning", activities.attrs)
+
+    def test_normalizes_grade_adjusted_fallback_separately_from_duplicate_distances(self) -> None:
+        activities = prepare_activities(
+            b"Activity ID,Type,Distance,Distance,Grade Adjusted Distance,"
+            b"Moving Time,Average Speed\n"
+            b"1,Ride,30,,,3600,8.33333\n2,Ride,20,,,3600,5.55556\n"
+            b"3,Ride,10,10000,,3600,2.77778\n4,Ride,,15000,,3600,4.16667\n"
+            b"5,Ride,,,12000,3600,3.33333\n"
+        )
+
+        self.assertEqual(activities["_distance_km"].tolist(), [30, 20, 10, 15, 12])
+        self.assertNotIn("unit_inference_warning", activities.attrs)
+
+    def test_warns_when_duplicate_distance_units_lack_evidence(self) -> None:
+        activities = prepare_activities(
+            b"Activity ID,Activity Type,Distance,Distance\n1,Ride,40000,\n2,Ride,,10\n"
+        )
+
+        self.assertIn(
+            "could not be verified for all distance columns",
+            activities.attrs["unit_inference_warning"],
+        )
+
     def test_missing_optional_columns_produce_safe_defaults(self) -> None:
         activities = prepare_activities(b"Activity Name\nUntimed activity\n")
 
@@ -92,6 +134,17 @@ class PrepareActivitiesTests(unittest.TestCase):
 
         self.assertEqual(str(activities["_date"].dtype), "datetime64[ns]")
         self.assertEqual(activities.loc[1, "_date"], pd.Timestamp("2024-01-02 10:00:00"))
+
+    def test_preserves_calendar_dates_when_start_times_have_offsets(self) -> None:
+        activities = prepare_activities(
+            b"Date,Start Time,Type\n2024-01-02,14:15:00+02:00,Ride\n"
+            b"2024-01-03,07:30-0500,Ride\n,18:00Z,Ride\n"
+        )
+
+        self.assertEqual(activities.loc[0, "_date"], pd.Timestamp("2024-01-02"))
+        self.assertEqual(activities.loc[1, "_date"], pd.Timestamp("2024-01-03"))
+        self.assertTrue(pd.isna(activities.loc[2, "_date"]))
+        self.assertEqual(activities["_start_hour"].tolist(), [14, 7, 18])
 
     def test_rejects_non_finite_and_negative_measurements(self) -> None:
         activities = prepare_activities(

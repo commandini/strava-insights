@@ -3,7 +3,6 @@ from __future__ import annotations
 import hashlib
 import math
 
-import pandas as pd
 import streamlit as st
 from streamlit import config as st_config
 
@@ -194,24 +193,17 @@ FILTER_KEYS = (
 )
 
 
-def clear_filter_state() -> None:
-    for key in FILTER_KEYS:
+def clear_source_state() -> None:
+    for key in (
+        *FILTER_KEYS, "filter_source_id", "filter_defaults", "source_activities", "activities",
+        "applied_filter_signature", "applied_date_range", "applied_filters", "report_pdf",
+    ):
         st.session_state.pop(key, None)
 
 
 def reset_filters() -> None:
     for key, value in st.session_state.get("filter_defaults", {}).items():
         st.session_state[key] = value
-
-
-@st.cache_data(show_spinner=False)
-def prepare_data(file_bytes: bytes) -> pd.DataFrame:
-    return prepare_activities(file_bytes)
-
-
-@st.cache_data(show_spinner=False)
-def prepare_pdf_download(model: dict, background_rgb: tuple[int, int, int]) -> bytes:
-    return build_report_pdf(model, background_rgb)
 
 
 st.title("Strava Insights")
@@ -229,19 +221,13 @@ with st.container(border=True):
         file_bytes = uploaded_file.getvalue()
         source_id = hashlib.sha256(file_bytes).hexdigest()
         if st.session_state.get("filter_source_id") != source_id:
-            clear_filter_state()
-            for key in (
-                "filter_defaults",
-                "activities",
-                "applied_filter_signature",
-                "applied_date_range",
-                "applied_filters",
-            ):
-                st.session_state.pop(key, None)
+            clear_source_state()
             st.session_state.filter_source_id = source_id
 
         try:
-            source_activities = prepare_data(file_bytes)
+            if "source_activities" not in st.session_state:
+                st.session_state.source_activities = prepare_activities(file_bytes)
+            source_activities = st.session_state.source_activities
         except Exception as error:
             st.error(f"Could not read the CSV: {error}")
             st.stop()
@@ -341,18 +327,14 @@ with st.container(border=True):
         process = action_column.button("Get Insights", type="primary", disabled=not valid_ranges)
         reset_column.button("Reset filters", on_click=reset_filters)
     elif st.session_state.get("filter_source_id"):
-        clear_filter_state()
-        for key in (
-            "filter_source_id", "filter_defaults", "activities",
-            "applied_filter_signature", "applied_date_range", "applied_filters",
-        ):
-            st.session_state.pop(key, None)
+        clear_source_state()
 
 if process:
     st.session_state.activities = filter_activities(
         source_activities, date_from, date_to, name_search, selected_series, activity_type,
         distance_min, distance_max, selected_gears, speed_min, speed_max,
     )
+    st.session_state.pop("report_pdf", None)
     st.session_state.applied_filter_signature = filter_signature
     st.session_state.applied_date_range = (date_from, date_to)
     st.session_state.applied_filters = {
@@ -408,9 +390,13 @@ with st.container(border=True):
             width="stretch",
         )
     with export_column:
+        pdf_background, pdf_bytes = st.session_state.get("report_pdf", (None, b""))
+        if pdf_background != selected_background_rgb:
+            pdf_bytes = build_report_pdf(report_model, selected_background_rgb)
+            st.session_state.report_pdf = (selected_background_rgb, pdf_bytes)
         st.download_button(
             "Export as PDF",
-            data=prepare_pdf_download(report_model, selected_background_rgb),
+            data=pdf_bytes,
             file_name="activity_report.pdf",
             mime="application/pdf",
             help="Download a PDF version of the report section.",

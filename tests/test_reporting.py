@@ -3,6 +3,7 @@ from datetime import date
 
 import pandas as pd
 
+from activity_processing import prepare_activities
 from reporting import (
     NAVY,
     PDF_FONT_REGULAR,
@@ -321,6 +322,21 @@ class CalendarHeatmapTests(unittest.TestCase):
         self.assertEqual(hours.loc[23, "Start hour"], "23:00-24:00")
         self.assertTrue(hours.loc[6, "Is peak"])
         self.assertEqual(hours["Is peak"].sum(), 1)
+
+    def test_hourly_heatmap_uses_recorded_times_and_skips_date_only_rows(self) -> None:
+        activities = prepare_activities(
+            b"Date,Start Time,Type\n"
+            b"2024-01-01,14:15,Ride\n2024-01-02,,Ride\n"
+            b"2024-01-03T00:00:00+02:00,,Ride\n"
+        )
+
+        hours = build_hourly_heatmap(activities).set_index("Hour")
+        self.assertEqual(hours.loc[0, "Activity count"], 1)
+        self.assertEqual(hours.loc[14, "Activity count"], 1)
+        self.assertEqual(int(hours["Activity count"].sum()), 2)
+        calendar = build_calendar_heatmap(activities).set_index("Calendar day")
+        self.assertEqual(calendar.loc["January 1", "Activity count"], 1)
+        self.assertEqual(int(calendar["Activity count"].sum()), 3)
 
     def test_heatmaps_preserve_offset_timestamp_local_day_and_hour(self) -> None:
         activities = activities_frame([

@@ -307,8 +307,11 @@ def build_calendar_heatmap(activities: pd.DataFrame) -> pd.DataFrame:
 def build_hourly_heatmap(activities: pd.DataFrame) -> pd.DataFrame:
     """Aggregate activity start times into a fixed 24-hour scaffold."""
     hours = pd.DataFrame({"Hour": range(24)})
-    start_times = datetime_series(activities, "_date")
-    activity_counts = start_times.dt.hour.value_counts()
+    start_hours = (
+        activities["_start_hour"] if "_start_hour" in activities
+        else datetime_series(activities, "_date").dt.hour
+    )
+    activity_counts = start_hours.value_counts()
 
     hours["Hour label"] = hours["Hour"].map(lambda hour: f"{hour:02d}")
     hours["Start hour"] = hours["Hour"].map(
@@ -936,27 +939,15 @@ def render_report(model: dict) -> None:
     if model["speed_distribution"].empty:
         st.info("No average speed information is available.")
     else:
-        st.altair_chart(
-            build_speed_distribution_chart(model["speed_distribution"]),
-            width="stretch",
-            theme=None,
-        )
+        st.altair_chart(build_speed_distribution_chart(model["speed_distribution"]), theme=None)
 
     st.subheader("Heatmaps")
     st.markdown("#### Calendar days")
     st.caption("Activity counts are aggregated by calendar day across all selected years.")
-    st.altair_chart(
-        build_calendar_heatmap_chart(model["calendar_heatmap"]),
-        width="stretch",
-        theme=None,
-    )
+    st.altair_chart(build_calendar_heatmap_chart(model["calendar_heatmap"]), theme=None)
     st.markdown("#### Start hours")
-    st.caption("Activity counts are grouped by start hour.")
-    st.altair_chart(
-        build_hourly_heatmap_chart(model["hourly_heatmap"]),
-        width="stretch",
-        theme=None,
-    )
+    st.caption("Only activities with a recorded start time are included.")
+    st.altair_chart(build_hourly_heatmap_chart(model["hourly_heatmap"]), theme=None)
 
     st.subheader("Gear usage")
     if model["gear"].empty:
@@ -1032,22 +1023,14 @@ def render_report(model: dict) -> None:
         if valid_distances.empty:
             st.info("No yearly distance information is available.")
         else:
-            st.altair_chart(
-                build_yearly_distance_chart(yearly),
-                width="stretch",
-                theme=None,
-            )
+            st.altair_chart(build_yearly_distance_chart(yearly), theme=None)
 
         st.markdown("#### Average speed per year")
         valid_speeds = yearly["Overall average speed (km/h)"].dropna()
         if valid_speeds.empty:
             st.info("No yearly average speed information is available.")
         else:
-            st.altair_chart(
-                build_yearly_speed_chart(yearly),
-                width="stretch",
-                theme=None,
-            )
+            st.altair_chart(build_yearly_speed_chart(yearly), theme=None)
 
 
 def _pdf_table(data, widths=None, header=True):
@@ -1530,7 +1513,7 @@ def build_report_pdf(
         Spacer(1, 2 * mm),
         Paragraph(
             "<b><font size=\"11\">Start hours</font></b><br/>"
-            "Activity counts are grouped by start hour. "
+            "Only activities with a recorded start time are included. "
             "A navy diamond marks the most active hour.",
             heatmap_intro_style,
         ),
